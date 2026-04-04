@@ -1,0 +1,70 @@
+[tool.poetry]
+name = "django-expressions"
+version = "0.1.0"
+description = "Named, reusable ORM expressions and prefetches for Django — no new API, just standard queryset methods."
+authors = ["occamz"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "dex"}]
+keywords = ["django", "orm", "queryset", "annotations", "expressions", "composable"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Framework :: Django",
+    "Framework :: Django :: 4.2",
+    "Framework :: Django :: 5.0",
+    "Framework :: Django :: 5.1",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+[tool.poetry.dependencies]
+python = ">=3.10"
+django = ">=4.2"
+
+[tool.poetry.group.dev.dependencies]
+pytest = ">=7.0"
+pytest-django = ">=4.5"
+psycopg2-binary = ">=2.9"
+ruff = ">=0.4"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "F",     # pyflakes
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "I",     # isort
+    "UP",    # pyupgrade
+    "B",     # flake8-bugbear
+    "SIM",   # flake8-simplify
+    "TCH",   # flake8-type-checking
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "TC002",  # django imports are needed at runtime, not just type-checking
+    "SIM108", # ternary operator — if/else blocks are clearer for our patterns
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["B018"]       # useless expressions are intentional (testing descriptor raises)
+"**/conftest.py" = ["SIM105", "SIM117"]  # try/except/pass and nested with are clearer here
+
+[tool.ruff.lint.isort]
+known-first-party = ["dex"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
