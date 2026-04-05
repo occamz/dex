@@ -23,6 +23,8 @@ and `prefetch_related()` with named references instead of inline expressions.
 pip install django-expressions
 ```
 
+Add `dex` to your Django settings:
+
 ```python
 # settings.py
 INSTALLED_APPS = [
@@ -30,6 +32,10 @@ INSTALLED_APPS = [
     "dex",
 ]
 ```
+
+> **Migrating an existing project?** See the [Migration Guide](MIGRATION_GUIDE.md) for a
+> step-by-step walkthrough of converting managers, inline annotations, and scattered query
+> logic to dex expressions.
 
 <details>
 <summary><strong>Example models used in this README</strong></summary>
@@ -563,3 +569,7 @@ These features are planned but not yet implemented:
 | `dex.Model` | Base model (convenience) | Model inheritance |
 
 Everything else is standard Django.
+
+## Further Reading
+
+- [Migration Guide](MIGRATION_GUIDE.md) — step-by-step refactoring from managers to dex

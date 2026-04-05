@@ -4,8 +4,10 @@ dex lets you define named, reusable ORM expressions and prefetches on Django mod
 They plug into standard Django queryset methods — no new query API to learn.
 
 Install: `pip install django-expressions` (imported as `dex`)
+Requires `"dex"` in `INSTALLED_APPS`.
 
-See README.md for full documentation. This file covers conventions for working with dex.
+See README.md for full documentation and MIGRATION_GUIDE.md for refactoring existing projects.
+This file covers conventions for working with dex.
 
 ## Quick Reference
 
