@@ -74,9 +74,9 @@ Use local imports inside expression bodies to avoid circular imports.
 def avg_rating():
     return models.Subquery(...)
 
-@dex.expression(models.BooleanField(), uses=[avg_rating, review_count])
+@dex.expression(models.BooleanField(), uses=[avg_rating])
 def is_top_rated():
-    return models.Q(avg_rating__gte=4.5, review_count__gte=10)
+    return models.Q(avg_rating__gte=4.5)
 ```
 
 Annotating `is_top_rated` auto-aliases its deps. Explicitly annotating a dep promotes it.

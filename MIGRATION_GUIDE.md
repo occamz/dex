@@ -141,7 +141,7 @@ posts.annotate(
 # AFTER (expressions/post.py):
 @dex.expression(models.IntegerField())
 def reply_count():
-    from community.models import Post
+    from myapp.models import Post
     return models.Subquery(
         Post.objects.filter(parent_id=models.OuterRef("id"))
         .values("parent")
@@ -167,7 +167,7 @@ def with_is_read(self, user):
 # AFTER (expressions/post.py):
 @dex.expression(models.BooleanField())
 def is_read(user):
-    from community.models import ReadReceipt
+    from myapp.models import ReadReceipt
     return models.Exists(
         ReadReceipt.objects.filter(post_id=models.OuterRef("id"), user=user)
     )
@@ -329,7 +329,7 @@ posts = Post.objects.prefetch_related(
 # AFTER (prefetches/post.py):
 @dex.prefetch()
 def latest_revisions():
-    from community.models import PostRevision
+    from myapp.models import PostRevision
     return models.Prefetch(
         "revisions",
         queryset=PostRevision.objects.filter(is_latest=True),
@@ -353,8 +353,9 @@ Post.objects.prefetch_related(Post.latest_revisions)
 
 ## Step 8: Clean Up
 
-1. **Remove old managers** — if a manager only existed for annotation methods, replace it
-   with `dex.Manager` (or inherit from `dex.Model`)
+1. **Remove old managers** — if a manager only existed for annotation/filter methods, its
+   logic now lives in expressions. Delete the manager class and use `dex.Model` or
+   `objects = dex.Manager()` directly
 2. **Remove duplicated annotations** — they now live in one place
 3. **Update tests** — replace `Post.objects.as_threads()` with
    `thread_overview(Post.objects.all())` or `Post.objects.annotate(Post.title, ...)`
@@ -370,5 +371,5 @@ Post.objects.prefetch_related(Post.latest_revisions)
 - [ ] Dependencies declared with `uses` (intermediates aliased, not leaked)
 - [ ] Large manager methods converted to `@dex.query`
 - [ ] Prefetch patterns converted to `@dex.prefetch()`
-- [ ] Old manager classes removed or simplified
+- [ ] Old manager classes removed
 - [ ] Tests updated and passing
