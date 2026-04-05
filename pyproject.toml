@@ -7,6 +7,8 @@ license = "MIT"
 readme = "README.md"
 packages = [{include = "dex"}]
 keywords = ["django", "orm", "queryset", "annotations", "expressions", "composable"]
+repository = "https://github.com/occamz/dex"
+homepage = "https://github.com/occamz/dex"
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Framework :: Django",
