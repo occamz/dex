@@ -19,6 +19,21 @@ class BaseModel(dex.Model):
 ```
 
 4. Update your models to inherit from this base (or add `objects = dex.Manager()` directly).
+   If you already have a custom manager with filter methods, extend `dex.Manager` instead of `models.Manager`:
+
+```python
+# BEFORE:
+class UserManager(models.Manager):
+    def active(self):
+        return self.filter(deactivated_at__isnull=True)
+
+# AFTER:
+import dex
+
+class UserManager(dex.Manager):
+    def active(self):
+        return self.filter(deactivated_at__isnull=True)
+```
 
 ## Step 1: Identify Candidates
 
@@ -249,6 +264,10 @@ def full_name():
 The `trimmed_name` dependency is applied as an alias — it exists for the query engine but
 doesn't appear on instances. Only `full_name` is visible.
 
+> **Note:** Intermediate expressions listed in `uses` don't need to be imported into the model
+> class. Only import expressions you want to use directly (e.g., in `.annotate()` or `.filter()`).
+> Intermediates are resolved automatically when a dependent expression is applied.
+
 ## Step 6: Extract Composed Queries
 
 Large manager methods that bundle many annotations become `@dex.query`:
@@ -273,6 +292,23 @@ thread_overview(Post.objects.filter(group=group)).order_by("-latest_activity")
 
 The individual expressions (`title`, `reply_count`, etc.) are still independently usable.
 The composed query is just a convenience for the common combination.
+
+Composed queries can accept parameters — extra arguments are forwarded after the queryset:
+
+```python
+# BEFORE (manager):
+class UserManager(models.Manager):
+    def with_milestone_birthday(self, reference_date):
+        return self.annotate(age_this_year=..., is_milestone=..., birthday_date=...)
+
+# AFTER (queries/user.py):
+@dex.query(User)
+def milestone_birthday(qs, reference_date):
+    return qs.annotate(...)
+
+# Usage:
+milestone_birthday(User.objects.all(), reference_date=ref_date)
+```
 
 ## Step 7: Extract Prefetches
 

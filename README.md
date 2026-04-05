@@ -376,6 +376,17 @@ Dependencies are:
 - **Clean** — intermediate fields don't leak into the result set
 - **Safe** — already-applied expressions are skipped (no double annotation)
 
+> **Tip:** Intermediate expressions listed in `uses` don't need to be imported into the model
+> class. Only import expressions you want to use directly (in `.annotate()`, `.filter()`, etc.).
+> Intermediates are resolved automatically.
+
+### Cross-model patterns
+
+When the same annotation pattern appears on multiple models via different field paths
+(e.g., `F("first_name")` on User vs `F("user__first_name")` on Membership), define
+separate expressions for each model. Each expression is scoped to its model's field
+namespace — there's no cross-model inheritance for expressions.
+
 ## Filter, Exclude, and Alias
 
 Expressions that return `Q` objects or `Exists` can be used directly in `.filter()` and
