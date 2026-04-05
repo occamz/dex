@@ -245,12 +245,30 @@ model — the in-class imports make it explicit.
 
 ### Loose expressions (unbound)
 
-Expressions can also be registered on a model using `@Model.expression()` without an
-in-class import. This works at runtime but the IDE won't resolve `Model.attr` for these.
-Use direct imports instead when referencing them.
+Expressions can be registered on a model externally using `@Model.expression()`:
 
-We recommend binding expressions to models via in-class imports when possible, as this
-gives the best IDE experience and makes the model self-documenting.
+```python
+# somewhere/extra.py
+from myapp.models import Recipe
+
+@Recipe.expression(models.DecimalField())
+def price_per_minute():
+    return models.F("price") / (models.F("prep_minutes") + models.F("cook_minutes"))
+```
+
+This attaches `price_per_minute` to `Recipe` at runtime, so `Recipe.objects.annotate(Recipe.price_per_minute)` works. However, the IDE won't resolve `Recipe.price_per_minute` since it's not in the class body. Use `from somewhere.extra import price_per_minute` directly when referencing it.
+
+Because these expressions are registered as a side effect of importing the module, you need to ensure the module is imported at startup. Use the `DEX` setting in `settings.py`:
+
+```python
+DEX = {
+    "MODULES": [
+        "somewhere.extra",
+    ],
+}
+```
+
+We recommend in-class imports over loose expressions when possible — they give better IDE support and make the model self-documenting.
 
 ## Parameterized Expressions
 
