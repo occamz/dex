@@ -5,8 +5,9 @@ inline annotations, and repeated query logic into dex's composable expression sy
 
 ## Prerequisites
 
-1. Add `dex` to `INSTALLED_APPS`
-2. Create a base model (or add `dex.Manager` to existing models):
+1. Install dex: `pip install django-expressions`
+2. Add `"dex"` to `INSTALLED_APPS`
+3. Create a base model (or add `dex.Manager` to existing models):
 
 ```python
 # models/base.py
@@ -17,7 +18,7 @@ class BaseModel(dex.Model):
         abstract = True
 ```
 
-3. Update your models to inherit from this base (or add `objects = dex.Manager()` directly).
+4. Update your models to inherit from this base (or add `objects = dex.Manager()` directly).
 
 ## Step 1: Identify Candidates
 

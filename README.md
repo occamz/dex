@@ -19,6 +19,10 @@ and `prefetch_related()` with named references instead of inline expressions.
 
 ## Installation
 
+```bash
+pip install django-expressions
+```
+
 ```python
 # settings.py
 INSTALLED_APPS = [
