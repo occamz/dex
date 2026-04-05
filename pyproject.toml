@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "django-expressions"
-version = "0.1.0"
+version = "0.1.1"
 description = "Named, reusable ORM expressions and prefetches for Django — no new API, just standard queryset methods."
 authors = ["occamz"]
 license = "MIT"
