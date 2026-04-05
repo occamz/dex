@@ -27,12 +27,18 @@ class UserManager(models.Manager):
     def active(self):
         return self.filter(deactivated_at__isnull=True)
 
-# AFTER:
-import dex
-
+# STEP 1 — extend dex.Manager to keep existing API working:
 class UserManager(dex.Manager):
     def active(self):
         return self.filter(deactivated_at__isnull=True)
+
+# STEP 2 — extract the filter into an expression, then remove the manager entirely:
+@dex.expression(models.BooleanField())
+def is_active():
+    return models.Q(deactivated_at__isnull=True)
+
+# Old: User.objects.active()
+# New: User.objects.filter(User.is_active)
 ```
 
 ## Step 1: Identify Candidates
