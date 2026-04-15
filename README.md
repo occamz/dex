@@ -1,21 +1,25 @@
-# dex — Django Expressions
+# dex - django expressions
 
-A lightweight library for defining named, reusable ORM expressions and prefetches on Django models. Use them through standard Django queryset methods — `annotate()`, `alias()`, `filter()`, `exclude()`, `prefetch_related()` — no new query API to learn.
+Named, reusable ORM expressions and prefetches for Django.
 
-### Is this for you?
+You define an expression once, bind it to a model, and use it through the standard queryset methods you already know: `annotate()`, `alias()`, `filter()`, `exclude()`, `prefetch_related()`.
 
-If any of these sound familiar, dex might help:
+Note: This project is early. The core works and is tested, but the API may still shift before 1.0.
 
-- "I keep copy-pasting the same `.annotate()` calls across views and serializers"
-- "My annotations are a mess and I can't tell which model supports what"
-- "Manager methods don't compose — I can't chain `.with_full_name().with_age()`"
-- "Wish I could combine querysets more easily without everything breaking"
-- "I have helper annotations cluttering my querysets that I only need for computing other fields"
-- "I want reusable, named annotations with IDE autocomplete"
+## Contents
 
-dex solves these by letting you define annotations once, bind them to models, and use them
-through standard Django queryset methods. No new API to learn — just `annotate()`, `filter()`,
-and `prefetch_related()` with named references instead of inline expressions.
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Scaling Up](#scaling-up)
+- [Parameterized Expressions](#parameterized-expressions)
+- [Dependencies](#dependencies)
+- [Filter, Exclude, and Alias](#filter-exclude-and-alias)
+- [Prefetches](#prefetches)
+- [Composed Queries](#composed-queries)
+- [IDE Support and Safety](#ide-support-and-safety)
+- [Configuration](#configuration)
+- [Future](#future)
+- [Summary](#summary)
 
 ## Installation
 
@@ -33,9 +37,7 @@ INSTALLED_APPS = [
 ]
 ```
 
-> **Migrating an existing project?** See the [Migration Guide](MIGRATION_GUIDE.md) for a
-> step-by-step walkthrough of converting managers, inline annotations, and scattered query
-> logic to dex expressions.
+Migrating an existing project? The [Migration Guide](MIGRATION_GUIDE.md) walks through converting managers, inline annotations, and scattered query logic to `dex` expressions.
 
 <details>
 <summary><strong>Example models used in this README</strong></summary>
@@ -90,7 +92,7 @@ class BaseModel(dex.Model):
         abstract = True
 ```
 
-Or, if you prefer not to use a base class:
+Or, if you prefer not to use a base class, add the manager directly:
 
 ```python
 class MyModel(models.Model):
@@ -99,10 +101,9 @@ class MyModel(models.Model):
 
 ### 2. Define expressions
 
-Expressions can be defined **inline** (in the model class) or **externally** (in separate
-files, bound to the model via in-class imports). Both give full IDE support.
+Expressions can live inline in the model class, or in separate files that the model imports in. Both work with full IDE support.
 
-#### Inline (small projects, simple expressions)
+#### Inline
 
 ```python
 import dex
@@ -125,13 +126,11 @@ class Recipe(BaseModel):
         return models.Q(prep_minutes__lte=10, cook_minutes__lte=20)
 ```
 
-> `@staticmethod` goes above `@dex.expression()` for inline expressions. This suppresses
-> IDE "missing self" warnings and is automatically unwrapped by dex.
+`@staticmethod` sits above `@dex.expression()` to suppress IDE "missing self" warnings. `dex` unwraps it automatically.
 
-#### External with in-class imports (recommended for larger projects)
+#### External with in-class imports
 
-Define expressions in separate files, then import them into the model class. The imports
-make them available as model attributes with full IDE support.
+Define in separate files, pull them into the model class body:
 
 ```python
 # expressions/recipe.py
@@ -169,37 +168,27 @@ class Recipe(BaseModel):
     from expressions.recipe import total_time, is_quick, is_vegetarian
 ```
 
-`Recipe.total_time` resolves in the IDE — autocomplete, go-to-definition, and
-find-usages all work. The model class serves as a manifest of its available expressions.
+`Recipe.total_time` resolves in the IDE, autocomplete and go-to-definition work, and the same expression can be imported into multiple models safely (each gets its own clone).
 
-The same expression can be safely imported into multiple models — each gets its own copy.
+Expression files never import the model they belong to, so no circular imports. If an expression body needs another model, use a local import inside the function.
 
-> **IDE note:** PyCharm may show "unused import" warnings on in-class imports. These are
-> false positives — the imports create class attributes used at runtime. Ruff correctly
-> recognizes them as used. You can suppress the PyCharm warning per-file with
-> `# noinspection PyUnresolvedReferences` above the import block.
-
-> **No circular imports:** Expression files use `@dex.expression()` (module-level), so they
-> never need to import the model they belong to. If an expression body needs another model
-> (e.g., for a subquery), use a local import inside the function.
+*IDE note:* PyCharm may flag in-class imports as unused. They aren't, they become class attributes at runtime. Ruff handles this correctly. For PyCharm, add `# noinspection PyUnresolvedReferences` above the import block.
 
 ### 3. Use them with standard Django methods
 
 ```python
-# Annotate — adds the field to the queryset:
+# Annotate adds the field to the queryset and to instances:
 Recipe.objects.annotate(Recipe.total_time).filter(total_time__lte=30)
 
-# Alias — for filtering/ordering without adding the field to instances:
+# Alias makes it available for filtering/ordering, but not on instances:
 Recipe.objects.alias(Recipe.total_time).filter(total_time__lte=30)
 
-# Filter — Q-returning expressions work directly:
+# Q-returning expressions work directly in filter/exclude:
 Recipe.objects.filter(Recipe.is_quick)
 Recipe.objects.filter(Recipe.is_vegetarian)
-
-# Exclude:
 Recipe.objects.exclude(Recipe.is_vegetarian)
 
-# Combine freely — it's all standard Django:
+# Combine freely, it's all standard Django:
 (Recipe.objects
     .annotate(Recipe.total_time)
     .filter(Recipe.is_vegetarian)
@@ -208,16 +197,7 @@ Recipe.objects.exclude(Recipe.is_vegetarian)
 
 ## Scaling Up
 
-### Migration path
-
-The progression from small to large project is gradual:
-
-**Phase 1 — Inline:** Expressions live in the model class. Simple, quick.
-
-**Phase 2 — External:** Expressions move to separate files as the model grows. The model
-gets in-class imports that serve as a readable manifest.
-
-**Phase 3 — Organized:** Expressions are grouped by domain into separate modules.
+Expressions tend to grow in place. Start inline, move to a file when the model gets busy, split that file when it gets big:
 
 ```python
 class Recipe(BaseModel):
@@ -246,12 +226,11 @@ class Recipe(BaseModel):
     from prefetches.recipe import top_reviews, ingredients_with_amounts
 ```
 
-Compare this to grepping across hundreds of files to find which annotations apply to a
-model — the in-class imports make it explicit.
+The in-class imports double as a readable manifest of what the model supports.
 
 ### Loose expressions (unbound)
 
-Expressions can be registered on a model externally using `@Model.expression()`:
+You can also register an expression on a model from outside the class body using `@Model.expression()`:
 
 ```python
 # somewhere/extra.py
@@ -262,9 +241,9 @@ def price_per_minute():
     return models.F("price") / (models.F("prep_minutes") + models.F("cook_minutes"))
 ```
 
-This attaches `price_per_minute` to `Recipe` at runtime, so `Recipe.objects.annotate(Recipe.price_per_minute)` works. However, the IDE won't resolve `Recipe.price_per_minute` since it's not in the class body. Use `from somewhere.extra import price_per_minute` directly when referencing it.
+This attaches `price_per_minute` to `Recipe` at runtime. Because there's no in-class import, the IDE won't resolve `Recipe.price_per_minute`, so you'd import the function directly where you use it.
 
-Because these expressions are registered as a side effect of importing the module, you need to ensure the module is imported at startup. Use the `DEX` setting in `settings.py`:
+Loose expressions register via import side effects, so the module needs to be imported at startup. Use the `DEX` setting:
 
 ```python
 DEX = {
@@ -274,11 +253,11 @@ DEX = {
 }
 ```
 
-We recommend in-class imports over loose expressions when possible — they give better IDE support and make the model self-documenting.
+In-class imports are usually nicer (better IDE support, self-documenting). Loose expressions are there when you need them.
 
 ## Parameterized Expressions
 
-Expressions can accept parameters. Define them as function arguments:
+Expressions can take parameters, just add function arguments:
 
 ```python
 # expressions/recipe.py
@@ -305,19 +284,14 @@ class Recipe(BaseModel):
 Call the expression with its arguments:
 
 ```python
-# Annotate:
 Recipe.objects.annotate(Recipe.is_saved(request.user))
-
-# Filter:
 Recipe.objects.filter(Recipe.is_saved(request.user))
-
-# Exclude:
 Recipe.objects.exclude(Recipe.is_saved(request.user))
 ```
 
 ## Dependencies
 
-An expression can declare that it depends on other expressions using `uses`:
+An expression can declare that it depends on others via `uses`:
 
 ```python
 # expressions/recipe_rating.py
@@ -349,48 +323,31 @@ def is_top_rated():
     return models.Q(avg_rating__gte=4.5, review_count__gte=10)
 ```
 
-When you annotate `is_top_rated`, its dependencies are automatically resolved first:
-
-```python
-Recipe.objects.annotate(Recipe.is_top_rated)
-# Internally: aliases avg_rating and review_count, then annotates is_top_rated
-```
-
-Dependencies are applied as **aliases** — they're available to the query engine but don't
-appear on instances. Only the explicitly requested expression shows up:
+Dependencies resolve automatically. Annotating `is_top_rated` applies `avg_rating` and `review_count` as *aliases*, so they're available to the query engine but not attached to instances:
 
 ```python
 recipe = Recipe.objects.annotate(Recipe.is_top_rated).first()
-recipe.is_top_rated    # True — explicitly annotated
-recipe.avg_rating      # raises ExpressionNotAnnotated — it was only aliased
+recipe.is_top_rated    # True
+recipe.avg_rating      # raises ExpressionNotAnnotated
+```
 
-# To also get avg_rating on instances, annotate it explicitly:
+If you also want a dependency on instances, annotate it explicitly. It gets promoted from alias to annotation:
+
+```python
 recipe = Recipe.objects.annotate(Recipe.avg_rating, Recipe.is_top_rated).first()
-recipe.avg_rating      # 4.8 — explicitly annotated, promoted from alias
+recipe.avg_rating      # 4.8
 recipe.is_top_rated    # True
 ```
 
-Dependencies are:
-- **Explicit** — declared right in the definition, IDE-navigable (not strings)
-- **Performant** — only declared deps are included, nothing extra
-- **Clean** — intermediate fields don't leak into the result set
-- **Safe** — already-applied expressions are skipped (no double annotation)
-
-> **Tip:** Intermediate expressions listed in `uses` don't need to be imported into the model
-> class. Only import expressions you want to use directly (in `.annotate()`, `.filter()`, etc.).
-> Intermediates are resolved automatically.
+Dependencies are declared as function references, not strings, so the IDE can follow them. Intermediates listed in `uses` don't need to be imported into the model class, only things you use directly do.
 
 ### Cross-model patterns
 
-When the same annotation pattern appears on multiple models via different field paths
-(e.g., `F("first_name")` on User vs `F("user__first_name")` on Membership), define
-separate expressions for each model. Each expression is scoped to its model's field
-namespace — there's no cross-model inheritance for expressions.
+When the same annotation applies to different models via different field paths (`F("first_name")` on User vs. `F("user__first_name")` on Membership), define separate expressions for each. Expressions are scoped to the model's field namespace.
 
 ## Filter, Exclude, and Alias
 
-Expressions that return `Q` objects or `Exists` can be used directly in `.filter()` and
-`.exclude()`:
+Expressions that return `Q` or `Exists` work directly in `.filter()` and `.exclude()`:
 
 ```python
 Recipe.objects.filter(Recipe.is_vegetarian)
@@ -398,17 +355,16 @@ Recipe.objects.exclude(Recipe.is_quick)
 Recipe.objects.filter(Recipe.is_saved(request.user))
 ```
 
-Non-Q expressions (e.g., `CharField`, `IntegerField`) can't be filtered directly — use
-`.annotate()` or `.alias()` first:
+Non-Q expressions (CharField, IntegerField, etc.) need `.annotate()` or `.alias()` first:
 
 ```python
-# annotate — field is on instances AND available for filtering:
+# annotate, value is on instances AND available for filtering:
 Recipe.objects.annotate(Recipe.total_time).filter(total_time__lte=30)
 
-# alias — field is available for filtering but NOT on instances:
+# alias, value is available for filtering but NOT on instances:
 Recipe.objects.alias(Recipe.total_time).filter(total_time__lte=30)
 
-# alias is useful when you only need to filter/sort, not display the value:
+# alias is handy when you only need to filter/sort, not display:
 Recipe.objects.alias(Recipe.avg_rating).filter(avg_rating__gte=4).order_by("-avg_rating")
 ```
 
@@ -421,7 +377,7 @@ Use .annotate(Recipe.total_time).filter(total_time__lte=...) instead.
 
 ## Prefetches
 
-Named, reusable prefetch recipes follow the same patterns as expressions.
+Prefetches follow the same patterns as expressions.
 
 ### Inline
 
@@ -481,9 +437,9 @@ Recipe.objects.prefetch_related(Recipe.ingredients_with_amounts)
     .order_by("-avg_rating"))
 ```
 
-## Composed Queries (Layer 2)
+## Composed Queries
 
-For reusable multi-field queries that compose expressions with additional logic:
+For multi-field queryset patterns you want to reuse:
 
 ```python
 # queries/recipe.py
@@ -508,38 +464,25 @@ def recipe_search(qs, user=None):
     return qs
 ```
 
-Usage — just call it with a queryset:
-
 ```python
 from queries.recipe import recipe_card, recipe_search
 
-# Simple:
 recipes = recipe_card(Recipe.objects.filter(Recipe.is_vegetarian))
 
-# With user context:
 recipes = recipe_search(Recipe.objects.all(), user=request.user)
 recipes = recipes.order_by("-avg_rating")
-
-# Compose multiple:
-recipes = recipe_card(Recipe.objects.all())
-recipes = recipes.filter(Recipe.is_quick)
 ```
 
-The `@dex.query` decorator gives the function an identity for future materialization support.
+The `@dex.query` decorator gives the function an identity tied to a model. Today that just lets it default to `Model.objects.all()` when called without a queryset, but it also leaves room for future materialization support (see [Future](#future)).
 
 ## IDE Support and Safety
 
-### Autocomplete and navigation
+Inline and in-class imported expressions are visible to the IDE. Autocomplete, go-to-definition, and find-usages work.
 
-Expressions defined inline or via in-class imports are visible to the IDE as model
-attributes. Autocomplete, go-to-definition, and find-usages work.
-
-### Missing annotation detection
-
-If you access an expression on an instance that wasn't annotated:
+If you access an expression on an instance that wasn't annotated, you get a clear error instead of a silent `None` or `AttributeError`:
 
 ```python
-recipe = Recipe.objects.first()  # No .annotate(Recipe.avg_rating)
+recipe = Recipe.objects.first()  # no .annotate(Recipe.avg_rating)
 recipe.avg_rating
 # AttributeError: 'avg_rating' is a dex expression on Recipe.
 # Call .annotate(Recipe.avg_rating) on the queryset first.
@@ -558,29 +501,29 @@ DEX = {
 }
 ```
 
-> **Note:** The `MODULES` setting is only needed for loose expressions (defined with
-> `@Model.expression()`) that aren't imported elsewhere. In-class imported expressions are
-> loaded automatically when the model is imported.
+`MODULES` is only needed for loose expressions (defined with `@Model.expression()`) that aren't imported elsewhere. In-class imports load automatically when the model does.
 
 ## Future
 
-These features are planned but not yet implemented:
+Planned, not yet implemented:
 
-- **Unused annotation warnings** — dev-mode detection of annotated fields that are never accessed on instances
-- **Materialized views** — `@dex.query` functions with `.refresh()` and `.from_cache()` methods for precomputing and caching query results
-- **Static analysis plugin** — mypy/pyright plugin to detect missing `.annotate()` calls at type-check time
+- **Unused annotation warnings.** Dev-mode detection of annotated fields that are never accessed on instances.
+- **Materialized views.** `@dex.query` functions with `.refresh()` and `.from_cache()` for precomputing and caching query results.
+- **Static analysis plugin.** mypy/pyright plugin to catch missing `.annotate()` calls at type-check time.
+
+See [FUTURE.md](FUTURE.md) for notes on each.
 
 ## Summary
 
-| Concept | Define with | Use in |
-|---------|------------|--------|
+| Concept | Defines | Used in |
+|---------|---------|---------|
 | `dex.expression` | Named ORM expression | `.annotate()`, `.alias()`, `.filter()`, `.exclude()` |
 | `dex.prefetch` | Named prefetch recipe | `.prefetch_related()` |
 | `dex.query` | Composed queryset function | Called directly |
-| `dex.Model` | Base model (convenience) | Model inheritance |
+| `dex.Model` | Base model with `dex.Manager` | Model inheritance |
 
 Everything else is standard Django.
 
 ## Further Reading
 
-- [Migration Guide](MIGRATION_GUIDE.md) — step-by-step refactoring from managers to dex
+- [Migration Guide](MIGRATION_GUIDE.md), step-by-step refactoring from managers to `dex`.

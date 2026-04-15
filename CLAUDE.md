@@ -1,13 +1,12 @@
-# dex — Django Expressions
+# dex - django expressions
 
-dex lets you define named, reusable ORM expressions and prefetches on Django models.
-They plug into standard Django queryset methods — no new query API to learn.
+`dex` lets you define named, reusable ORM expressions and prefetches on Django models.
+They plug into the standard Django queryset methods.
 
-Install: `pip install django-expressions` (imported as `dex`)
+Install: `pip install django-expressions` (imported as `dex`).
 Requires `"dex"` in `INSTALLED_APPS`.
 
-See README.md for full documentation and MIGRATION_GUIDE.md for refactoring existing projects.
-This file covers conventions for working with dex.
+See `README.md` for full docs and `MIGRATION_GUIDE.md` for refactoring existing projects.
 
 ## Quick Reference
 
@@ -35,7 +34,7 @@ Recipe.objects.prefetch_related(Recipe.top_reviews)
 
 ### Inline (inside a class body)
 
-`@staticmethod` must go ABOVE `@dex.expression()` to suppress IDE warnings:
+`@staticmethod` must sit ABOVE `@dex.expression()` to suppress IDE warnings:
 
 ```python
 class Recipe(dex.Model):
@@ -50,7 +49,7 @@ class Recipe(dex.Model):
 Define in a separate file, import into the model class body:
 
 ```python
-# expressions/recipe.py — no @staticmethod needed
+# expressions/recipe.py, no @staticmethod needed
 @dex.expression(models.BooleanField())
 def is_vegetarian():
     from myapp.models import RecipeIngredient
@@ -91,7 +90,7 @@ def recipe_card(qs):
     return qs.annotate(Recipe.total_time, Recipe.avg_rating, Recipe.review_count)
 ```
 
-Called with: `recipe_card(Recipe.objects.filter(...)).order_by(...)`
+Called with: `recipe_card(Recipe.objects.filter(...)).order_by(...)`.
 
 ## Prefetches
 
@@ -102,7 +101,7 @@ def top_reviews():
     from myapp.models import Review
     return models.Prefetch("reviews", queryset=Review.objects.filter(score__gte=4), to_attr="top_reviews")
 
-# models/recipe.py — bind via in-class import
+# models/recipe.py, bind via in-class import
 class Recipe(dex.Model):
     from myapp.prefetches.recipe import top_reviews
 
@@ -112,12 +111,12 @@ Recipe.objects.prefetch_related(Recipe.top_reviews)
 
 ## Import Style
 
-Use `from django.db import models` then `models.F(...)`, `models.Q(...)`, `models.Value(...)`,
+Use `from django.db import models`, then `models.F(...)`, `models.Q(...)`, `models.Value(...)`,
 `models.Subquery(...)`, `models.functions.Concat(...)`, etc.
 
 ## What NOT to Do
 
-- Don't skip `@staticmethod` on inline expressions (causes IDE warnings)
-- Don't import models at module level in expression files (circular imports)
-- Don't define expressions that modify queryset state beyond their single annotation
-- Don't access expression values on instances without `.annotate()` first
+- Don't skip `@staticmethod` on inline expressions (causes IDE warnings).
+- Don't import models at module level in expression files (circular imports).
+- Don't define expressions that modify queryset state beyond their single annotation.
+- Don't access expression values on instances without `.annotate()` first.

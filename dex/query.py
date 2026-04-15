@@ -7,11 +7,11 @@ from django.db import models
 
 
 class QueryWrapper:
-    """
-    Wraps a composed query function with model identity and future materialization hooks.
+    """A composed-query function tied to a model.
 
-    The wrapped function takes a queryset as its first argument and returns a queryset.
-    If called without a queryset, it defaults to Model.objects.all().
+    The wrapped function takes a queryset as its first argument and returns
+    a queryset. Called without one, it defaults to `Model.objects.all()`.
+    The model identity also leaves room for future materialization hooks.
     """
 
     def __init__(self, fn: t.Callable, model: type[models.Model]):
@@ -30,15 +30,13 @@ class QueryWrapper:
 
 
 def query(model: type[models.Model]) -> t.Callable:
-    """
-    Decorator for defining composed queries (Layer 2).
+    """Decorator for composed queries bound to a model.
 
     Usage:
         @dex.query(Recipe)
         def recipe_card(qs):
             return qs.annotate(Recipe.total_time, Recipe.avg_rating)
 
-        # Call it:
         recipe_card(Recipe.objects.filter(is_published=True)).order_by(...)
     """
 

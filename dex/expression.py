@@ -8,18 +8,14 @@ from dex.exceptions import ExpressionNotAnnotated
 
 
 class ExpressionRef(staticmethod):
-    """
-    A named, reusable ORM expression bound to a Django model.
+    """A named ORM expression bound to a Django model.
 
-    Inherits from staticmethod so that PyCharm recognizes decorated functions
-    inside class bodies don't need a `self` parameter.
+    Subclasses staticmethod so PyCharm doesn't flag `self`-less functions
+    in class bodies. Acts as a descriptor: class access returns the ref,
+    instance access returns the annotated value (or raises).
 
-    Acts as a descriptor on the model class:
-    - Class access (Model.ref) returns the ExpressionRef itself (for use in queryset methods)
-    - Instance access (instance.ref) returns the annotated value, or raises if not annotated
-
-    Can be called with arguments for parameterized expressions:
-        Model.is_read(user) → BoundExpressionRef
+    Call it with arguments for parameterized expressions:
+        Model.is_read(user)  ->  BoundExpressionRef
     """
 
     def __init__(
@@ -45,7 +41,7 @@ class ExpressionRef(staticmethod):
         if obj is None:
             return self
 
-        # Instance access — return the annotated value
+        # Instance access: return the annotated value if present.
         if self.field_name in obj.__dict__:
             return obj.__dict__[self.field_name]
 
@@ -58,7 +54,7 @@ class ExpressionRef(staticmethod):
         return BoundExpressionRef(self, args, kwargs)
 
     def _clone(self, field_name: str, model: type[models.Model]) -> ExpressionRef:
-        """Create a copy bound to a specific model."""
+        """Return a copy bound to a specific model."""
         return ExpressionRef(
             field_name=field_name,
             output_field=self.output_field,
@@ -68,23 +64,22 @@ class ExpressionRef(staticmethod):
         )
 
     def contribute_to_class(self, cls: type[models.Model], name: str) -> None:
-        """Called by Django's ModelBase metaclass for inline and in-class-imported expressions."""
+        """Register on the model. Called by Django's ModelBase metaclass."""
         # Clone so the same ExpressionRef can be imported into multiple models
-        # without them sharing mutable state (model, field_name)
+        # without sharing mutable state (model, field_name).
         ref = self._clone(field_name=name, model=cls)
-        # Always ensure a class-local dict (don't mutate parent's)
         if "_dex_expressions" not in cls.__dict__:
             cls._dex_expressions = {}
         cls._dex_expressions[name] = ref
         setattr(cls, name, ref)
 
     def resolve(self) -> t.Any:
-        """Evaluate the expression function (no arguments)."""
+        """Evaluate the expression function with no arguments."""
         return self.expression_fn()
 
 
 class BoundExpressionRef:
-    """An ExpressionRef with bound arguments for parameterized expressions."""
+    """An `ExpressionRef` with bound call arguments (parameterized expressions)."""
 
     def __init__(
         self,
@@ -116,15 +111,12 @@ class BoundExpressionRef:
         return self.ref.model
 
     def resolve(self) -> t.Any:
-        """Evaluate the expression function with bound arguments."""
+        """Evaluate the expression function with the bound arguments."""
         return self.ref.expression_fn(*self.args, **self.kwargs)
 
 
 def _unwrap_function(fn: t.Any) -> t.Callable:
-    """
-    Unwrap @staticmethod or ExpressionRef if present, returning the raw callable.
-    Handles cases where an already-decorated ExpressionRef is passed to @Model.expression().
-    """
+    """Return the raw callable from a `@staticmethod` or `ExpressionRef` wrapper."""
     if isinstance(fn, staticmethod):
         return fn.__func__
     if isinstance(fn, ExpressionRef):
@@ -137,8 +129,7 @@ def expression(
     *,
     uses: list[ExpressionRef] | None = None,
 ) -> t.Callable[[t.Callable], ExpressionRef]:
-    """
-    Decorator for defining named expressions on a model.
+    """Decorator that turns a function into a named model expression.
 
     Inline usage:
         class User(dex.Model):
@@ -147,11 +138,9 @@ def expression(
             def full_name():
                 return Concat(F("first_name"), Value(" "), F("last_name"))
 
-    The @staticmethod is recommended for inline expressions to suppress IDE warnings.
-    It is automatically unwrapped by dex.
-
-    The returned ExpressionRef has contribute_to_class, so Django's ModelBase
-    metaclass will pick it up and register it on the model.
+    `@staticmethod` suppresses IDE warnings on inline definitions and is
+    unwrapped automatically. The returned `ExpressionRef` registers itself
+    on the model via Django's `contribute_to_class` hook.
     """
 
     def decorator(fn: t.Callable) -> ExpressionRef:
@@ -167,10 +156,9 @@ def expression(
 
 
 def _make_model_expression_classmethod() -> classmethod:
-    """
-    Creates the .expression() classmethod that gets attached to models by the Manager.
+    """Build the `.expression()` classmethod attached to models by the Manager.
 
-    Usage (external, in a separate file):
+    Enables external, out-of-class registration:
         @User.expression(models.CharField())
         def full_name():
             return Concat(F("first_name"), Value(" "), F("last_name"))

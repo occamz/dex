@@ -6,15 +6,13 @@ from dex.manager import DEXManager
 
 
 class Model(models.Model):
-    """
-    Convenience abstract base model that sets up dex.Manager as default manager.
+    """Abstract base model with `dex.Manager` set as `objects`.
 
-    Usage:
+    Equivalent to adding `objects = dex.Manager()` to your model:
+
         class BaseModel(dex.Model):
             class Meta:
                 abstract = True
-
-    Equivalent to manually adding `objects = dex.Manager()` to your model.
     """
 
     objects = DEXManager()
@@ -28,23 +26,22 @@ class Model(models.Model):
 
 
 def _unwrap_staticmethod_refs(cls: type[models.Model]) -> None:
-    """
-    Detect @staticmethod-wrapped ExpressionRefs and PrefetchRefs in a model's
-    class dict and unwrap them. This handles the case where @staticmethod is
-    placed above @dex.expression() / @dex.prefetch() for IDE compatibility.
+    """Unwrap `@staticmethod`-wrapped refs in a model's class dict.
+
+    Handles the inline pattern where `@staticmethod` sits above
+    `@dex.expression()` or `@dex.prefetch()` for IDE compatibility.
     """
     from dex.expression import ExpressionRef
     from dex.prefetch import PrefetchRef
 
-    # Ensure class-local registries
     if "_dex_expressions" not in cls.__dict__:
         cls._dex_expressions = {}
     if "_dex_prefetches" not in cls.__dict__:
         cls._dex_prefetches = {}
 
     for attr_name, value in list(cls.__dict__.items()):
-        # Only look at plain staticmethod wrappers (not ExpressionRef/PrefetchRef
-        # which inherit from staticmethod but are already handled)
+        # Only plain staticmethod wrappers. ExpressionRef/PrefetchRef also
+        # subclass staticmethod but are registered via contribute_to_class.
         if type(value) is not staticmethod:
             continue
 

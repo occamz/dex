@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "django-expressions"
 version = "0.1.1"
-description = "Named, reusable ORM expressions and prefetches for Django — no new API, just standard queryset methods."
+description = "Named, reusable ORM expressions and prefetches for Django. No new API, just standard queryset methods."
 authors = ["occamz"]
 license = "MIT"
 readme = "README.md"
@@ -57,7 +57,7 @@ select = [
 ignore = [
     "E501",   # line too long (handled by formatter)
     "TC002",  # django imports are needed at runtime, not just type-checking
-    "SIM108", # ternary operator — if/else blocks are clearer for our patterns
+    "SIM108", # ternary operator, if/else blocks are clearer for our patterns
 ]
 
 [tool.ruff.lint.per-file-ignores]

@@ -13,7 +13,7 @@ if t.TYPE_CHECKING:
 
 
 def __getattr__(name: str):
-    """Lazy imports for Model, Manager, and introspection — avoids Django AppRegistryNotReady."""
+    """Lazy imports for Model, Manager, and introspection. Avoids Django AppRegistryNotReady."""
     if name == "Model":
         from dex.model import Model
 

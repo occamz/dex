@@ -6,18 +6,15 @@ from django.db import models
 
 
 class PrefetchRef(staticmethod):
-    """
-    A named, reusable prefetch recipe bound to a Django model.
+    """A named prefetch recipe bound to a Django model.
 
-    Inherits from staticmethod so that PyCharm recognizes decorated functions
-    inside class bodies don't need a `self` parameter.
+    Subclasses staticmethod so PyCharm doesn't flag `self`-less functions
+    in class bodies. Acts as a descriptor: class access returns the ref.
+    Prefetched data lives in Django's `_prefetched_objects_cache`, so
+    instance access isn't meaningful here.
 
-    Acts as a descriptor on the model class:
-    - Class access (Model.ref) returns the PrefetchRef itself
-    - Instance access falls through to Django's default (the prefetched relation)
-
-    Can be called with arguments for parameterized prefetches:
-        Model.assets("reply_to") → BoundPrefetchRef
+    Call it with arguments for parameterized prefetches:
+        Model.assets("reply_to")  ->  BoundPrefetchRef
     """
 
     def __init__(
@@ -38,9 +35,9 @@ class PrefetchRef(staticmethod):
     def __get__(self, obj: t.Any, objtype: type | None = None) -> t.Any:
         if obj is None:
             return self
-        # Instance access — fall through to Django's default attribute resolution.
-        # Prefetched data lives in _prefetched_objects_cache, which Django handles.
-        # If the attribute isn't there, raise the standard AttributeError.
+        # Instance access: Django normally populates prefetched attrs via
+        # _prefetched_objects_cache. If that hasn't happened, raise so the
+        # user knows to call .prefetch_related() on the queryset.
         raise AttributeError(
             f"'{objtype.__name__}' object has no attribute '{self.name}'. "
             f"If this is a dex prefetch, call "
@@ -51,7 +48,7 @@ class PrefetchRef(staticmethod):
         return BoundPrefetchRef(self, args, kwargs)
 
     def _clone(self, name: str, model: type[models.Model]) -> PrefetchRef:
-        """Create a copy bound to a specific model."""
+        """Return a copy bound to a specific model."""
         return PrefetchRef(
             name=name,
             prefetch_fn=self.prefetch_fn,
@@ -59,22 +56,21 @@ class PrefetchRef(staticmethod):
         )
 
     def contribute_to_class(self, cls: type[models.Model], name: str) -> None:
-        """Called by Django's ModelBase metaclass for inline and in-class-imported prefetches."""
-        # Clone so the same PrefetchRef can be imported into multiple models
+        """Register on the model. Called by Django's ModelBase metaclass."""
+        # Clone so the same PrefetchRef can be imported into multiple models.
         ref = self._clone(name=name, model=cls)
-        # Always ensure a class-local dict (don't mutate parent's)
         if "_dex_prefetches" not in cls.__dict__:
             cls._dex_prefetches = {}
         cls._dex_prefetches[name] = ref
         setattr(cls, name, ref)
 
     def resolve(self) -> t.Any:
-        """Evaluate the prefetch function (no arguments). Returns a Prefetch object."""
+        """Evaluate the function with no arguments. Returns a `Prefetch`."""
         return self.prefetch_fn()
 
 
 class BoundPrefetchRef:
-    """A PrefetchRef with bound arguments for parameterized prefetches."""
+    """A `PrefetchRef` with bound call arguments (parameterized prefetches)."""
 
     def __init__(
         self,
@@ -98,12 +94,12 @@ class BoundPrefetchRef:
         return self.ref.model
 
     def resolve(self) -> t.Any:
-        """Evaluate the prefetch function with bound arguments."""
+        """Evaluate the prefetch function with the bound arguments."""
         return self.ref.prefetch_fn(*self.args, **self.kwargs)
 
 
 def _unwrap_function(fn: t.Any) -> t.Callable:
-    """Unwrap @staticmethod or PrefetchRef if present, returning the raw callable."""
+    """Return the raw callable from a `@staticmethod` or `PrefetchRef` wrapper."""
     if isinstance(fn, staticmethod):
         return fn.__func__
     if isinstance(fn, PrefetchRef):
@@ -112,8 +108,7 @@ def _unwrap_function(fn: t.Any) -> t.Callable:
 
 
 def prefetch() -> t.Callable[[t.Callable], PrefetchRef]:
-    """
-    Decorator for defining named prefetches on a model.
+    """Decorator that turns a function into a named model prefetch.
 
     Inline usage:
         class ContentItem(dex.Model):
@@ -133,10 +128,9 @@ def prefetch() -> t.Callable[[t.Callable], PrefetchRef]:
 
 
 def _make_model_prefetch_classmethod() -> classmethod:
-    """
-    Creates the .prefetch() classmethod that gets attached to models by the Manager.
+    """Build the `.prefetch()` classmethod attached to models by the Manager.
 
-    Usage (external, in a separate file):
+    Enables external, out-of-class registration:
         @ContentItem.prefetch()
         def assets():
             return Prefetch("item_assets", queryset=...)

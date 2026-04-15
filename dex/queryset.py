@@ -18,14 +18,11 @@ def _apply_expression(
     _resolving: frozenset[str] | None = None,
     _as_alias: bool = False,
 ) -> DEXQuerySet:
-    """
-    Apply a dex expression to a queryset, resolving dependencies first.
+    """Apply a `dex` expression to a queryset, resolving dependencies first.
 
-    Dependencies from `uses` are applied as aliases (not in SELECT, not on instances).
-    Explicitly annotated expressions are applied as annotations.
-
-    If an expression was previously aliased and is now explicitly annotated, it gets
-    promoted from alias to annotation.
+    Dependencies from `uses` are applied as aliases (not in SELECT, not on
+    instances). Explicit annotations are applied as annotations, and will
+    promote a prior alias of the same name.
     """
     if isinstance(ref, BoundExpressionRef):
         expr_ref = ref.ref
@@ -49,27 +46,24 @@ def _apply_expression(
     annotations = getattr(qs, "_dex_annotations", set())
     aliases = getattr(qs, "_dex_aliases", set())
 
-    # Skip if already annotated (strongest state — nothing to do)
+    # Already annotated, nothing to do.
     if field_name in annotations:
         return qs
 
-    # Skip if already aliased AND we only need an alias
+    # Already aliased and only an alias is needed.
     if field_name in aliases and _as_alias:
         return qs
 
-    # Resolve the expression
     resolved_expression = ref.resolve()
 
     if _as_alias:
-        # Apply as alias — available to the query engine but not in SELECT
+        # Alias: available to the query engine, not in SELECT.
         qs = models.QuerySet.alias(qs, **{field_name: resolved_expression})
         qs._dex_aliases = aliases | {field_name}
     else:
-        # Apply as annotation — in SELECT, on instances
-        # This also handles promotion from alias to annotation
+        # Annotation: in SELECT, on instances. Also promotes a prior alias.
         qs = models.QuerySet.annotate(qs, **{field_name: resolved_expression})
         qs._dex_annotations = annotations | {field_name}
-        # Remove from aliases if it was promoted
         if field_name in aliases:
             qs._dex_aliases = aliases - {field_name}
 
@@ -77,7 +71,7 @@ def _apply_expression(
 
 
 def _is_filterable(expression: t.Any) -> bool:
-    """Check if an expression can be used directly in filter/exclude."""
+    """True if an expression can be passed directly to `filter()` or `exclude()`."""
     if isinstance(expression, (Q, Exists)):
         return True
     if isinstance(expression, ExpressionWrapper):
@@ -86,27 +80,26 @@ def _is_filterable(expression: t.Any) -> bool:
 
 
 def _resolve_expression(ref: ExpressionRef | BoundExpressionRef) -> t.Any:
-    """Resolve an ExpressionRef or BoundExpressionRef to its Django expression."""
+    """Resolve a ref to its underlying Django expression."""
     return ref.resolve()
 
 
 def _get_expression_ref(ref: ExpressionRef | BoundExpressionRef) -> ExpressionRef:
-    """Unwrap a BoundExpressionRef to get the underlying ExpressionRef."""
+    """Return the underlying `ExpressionRef`, unwrapping a `BoundExpressionRef`."""
     if isinstance(ref, BoundExpressionRef):
         return ref.ref
     return ref
 
 
 class DEXQuerySet(models.QuerySet):
-    """
-    Custom QuerySet that overrides annotate, filter, exclude, and prefetch_related
-    to accept dex ExpressionRef and PrefetchRef objects alongside regular Django args.
+    """QuerySet that accepts `ExpressionRef` and `PrefetchRef` objects.
 
-    Overrides: annotate, alias, filter, exclude, prefetch_related.
+    Overrides `annotate`, `alias`, `filter`, `exclude`, and `prefetch_related`
+    so they take dex refs alongside normal Django arguments.
 
-    Tracks two sets of applied expressions:
-    - _dex_annotations: explicitly annotated (in SELECT, on instances)
-    - _dex_aliases: auto-resolved dependencies (available to query engine, not on instances)
+    Tracks two sets:
+    - `_dex_annotations`: explicitly annotated (in SELECT, on instances).
+    - `_dex_aliases`: auto-resolved dependencies (query engine only).
     """
 
     def _chain(self, **kwargs: t.Any) -> Self:
@@ -116,7 +109,7 @@ class DEXQuerySet(models.QuerySet):
         return obj
 
     def annotate(self, *args: t.Any, **kwargs: t.Any) -> Self:
-        """Accepts ExpressionRef/BoundExpressionRef as positional args alongside regular Django args."""
+        """Annotate, accepting dex refs as positional args."""
         qs = self
         regular_args = []
 
@@ -131,7 +124,7 @@ class DEXQuerySet(models.QuerySet):
         return qs
 
     def alias(self, *args: t.Any, **kwargs: t.Any) -> Self:
-        """Accepts ExpressionRef/BoundExpressionRef as positional args. Aliases them (not in SELECT)."""
+        """Alias, accepting dex refs as positional args (not in SELECT)."""
         qs = self
         regular_args = []
 
@@ -146,7 +139,7 @@ class DEXQuerySet(models.QuerySet):
         return qs
 
     def filter(self, *args: t.Any, **kwargs: t.Any) -> Self:
-        """Accepts Q-returning ExpressionRefs as positional args. Raises FilterError for non-filterable expressions."""
+        """Filter, accepting Q-returning dex refs. Non-filterable refs raise `FilterError`."""
         resolved_args: list[t.Any] = []
 
         for arg in args:
@@ -168,7 +161,7 @@ class DEXQuerySet(models.QuerySet):
         return super().filter(*resolved_args, **kwargs)
 
     def exclude(self, *args: t.Any, **kwargs: t.Any) -> Self:
-        """Same as filter() but excludes matching rows. Raises FilterError for non-filterable expressions."""
+        """Exclude, accepting Q-returning dex refs. Non-filterable refs raise `FilterError`."""
         resolved_args: list[t.Any] = []
 
         for arg in args:
@@ -190,7 +183,7 @@ class DEXQuerySet(models.QuerySet):
         return super().exclude(*resolved_args, **kwargs)
 
     def prefetch_related(self, *lookups: t.Any) -> Self:
-        """Accepts PrefetchRef/BoundPrefetchRef alongside regular Django Prefetch/string lookups."""
+        """Prefetch, accepting dex refs alongside regular `Prefetch`/string lookups."""
         from dex.prefetch import BoundPrefetchRef, PrefetchRef
 
         resolved: list[t.Any] = []
